@@ -14,16 +14,21 @@ import static org.eclipse.egit.github.core.client.IGitHubConstants.SEGMENT_CONTE
 import static org.eclipse.egit.github.core.client.IGitHubConstants.SEGMENT_README;
 import static org.eclipse.egit.github.core.client.IGitHubConstants.SEGMENT_REPOS;
 
-import com.google.gson.reflect.TypeToken;
-
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.egit.github.core.IRepositoryIdProvider;
 import org.eclipse.egit.github.core.RepositoryContents;
+import org.eclipse.egit.github.core.RepositoryFile;
 import org.eclipse.egit.github.core.client.GitHubClient;
 import org.eclipse.egit.github.core.client.GitHubRequest;
+import org.eclipse.egit.github.core.client.RequestException;
+
+import com.google.gson.reflect.TypeToken;
 
 /**
  * Service for accessing repository contents
@@ -148,5 +153,123 @@ public class ContentsService extends GitHubService {
 			return Collections.singletonList((RepositoryContents) body);
 		else
 			return (List<RepositoryContents>) body;
+	}
+
+	/**
+	 * Create file in given repository on master branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @return file
+	 * @throws IOException
+	 */
+	public RepositoryFile createFile(IRepositoryIdProvider repository, RepositoryContents file) throws IOException {
+		return saveFile(repository, file);
+	}
+
+	/**
+	 * Create file in given repository on given branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @return file
+	 * @throws IOException
+	 */
+	public RepositoryFile createFile(IRepositoryIdProvider repository, RepositoryContents file, String branch) throws IOException {
+		return saveFile(repository, file, branch);
+	}
+
+	/**
+	 * Update file in given repository on master branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @return file
+	 * @throws IOException
+	 */
+	public RepositoryFile updateFile(IRepositoryIdProvider repository, RepositoryContents file) throws IOException {
+		return saveFile(repository, file);
+	}
+
+	/**
+	 * Create file in given repository on given branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @return file
+	 * @throws IOException
+	 */
+	public RepositoryFile updateFile(IRepositoryIdProvider repository, RepositoryContents file, String branch) throws IOException {
+		return saveFile(repository, file, branch);
+	}
+
+	/**
+	 * Delete file in given repository on master branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @throws IOException
+	 */
+	public void deleteFile(IRepositoryIdProvider repository, RepositoryContents file) throws IOException {
+		deleteFile(repository, file, null);
+	}
+
+	/**
+	 * Delete file in given repository on given branch
+	 *
+	 * @param repository
+	 * @param file
+	 * @throws IOException
+	 */
+	public void deleteFile(IRepositoryIdProvider repository, RepositoryContents file, String branch) throws IOException {
+		String id = getId(repository);
+		String uri = createFileURI(file, id);
+		Map<String, String> paramMap = buildFileParamMap(file, branch);
+		try {
+			client.delete(uri, paramMap);
+		} catch (RequestException e) {
+			if (e.getStatus() != HttpURLConnection.HTTP_OK) { // ignore Status: 200 OK
+				throw e;
+			}
+		}
+	}
+
+	private RepositoryFile saveFile(IRepositoryIdProvider repository, RepositoryContents file) throws IOException {
+		return updateFile(repository, file, null);
+	}
+
+	private RepositoryFile saveFile(IRepositoryIdProvider repository, RepositoryContents file, String branch) throws IOException {
+		String id = getId(repository);
+		String uri = createFileURI(file, id);
+		Map<String, String> paramMap = buildFileParamMap(file, branch);
+		return client.put(uri, paramMap, RepositoryFile.class);
+	}
+
+	private String createFileURI(RepositoryContents file, String id) {
+		StringBuilder uri = new StringBuilder(SEGMENT_REPOS);
+		uri.append('/').append(id);
+		uri.append(SEGMENT_CONTENTS);
+		uri.append('/').append(file.getPath());
+		return uri.toString();
+	}
+
+	private Map<String, String> buildFileParamMap(RepositoryContents file, String branch) {
+		Map<String, String> paramMap = new HashMap<String, String>();
+		if (file.getSha() != null) {
+			paramMap.put("sha", file.getSha());
+			if (file.getContent() != null) {
+				paramMap.put("content", file.getContent());
+				paramMap.put("message", "update file " +  file.getName());
+			} else {
+				paramMap.put("message", "delete file " +  file.getName());
+			}
+		} else {
+			paramMap.put("content", file.getContent());
+			paramMap.put("message", "create file " +  file.getName());
+		}
+		if (branch != null) {
+			paramMap.put("branch", branch);
+		}
+		return paramMap;
 	}
 }

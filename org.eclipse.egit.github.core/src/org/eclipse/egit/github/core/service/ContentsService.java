@@ -156,6 +156,39 @@ public class ContentsService extends GitHubService {
 	}
 
 	/**
+	 * Check if contents at path exist in the given repository
+	 *
+	 * @param repository
+	 * @param path
+	 * @return true if contents at path exist
+	 * @throws IOException
+	 */
+	public boolean exists(IRepositoryIdProvider repository, String path) throws IOException {
+		return exists(repository, path, null);
+	}
+
+	/**
+	 * Check if contents at path exist in the given repository
+	 *
+	 * @param repository
+	 * @param path
+	 * @param ref
+	 * @return true if contents at path exist
+	 * @throws IOException
+	 */
+	public boolean exists(IRepositoryIdProvider repository, String path, String ref) throws IOException {
+		try {
+			return getContents(repository, path, ref).size() != 0;
+		} catch (RequestException e) {
+			if (e.getMessage().equals("Not Found (404)")) {
+				return false;
+			} else {
+				throw e;
+			}
+		}
+	}
+
+	/**
 	 * Create file in given repository on master branch
 	 *
 	 * @param repository
